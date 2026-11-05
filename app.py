@@ -174,7 +174,7 @@ def login():
             flash('Please complete the reCAPTCHA.', 'error')
             return render_template('login.html')
 
-        recaptcha_secret = '6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe'
+        recaptcha_secret = os.environ.get('RECAPTCHA_SECRET', '6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe')  # default = Google's public test secret
         verify_url = 'https://www.google.com/recaptcha/api/siteverify'
         payload = {'secret': recaptcha_secret, 'response': recaptcha_response, 'remoteip': request.remote_addr}
         r = requests.post(verify_url, data=payload)
@@ -461,7 +461,7 @@ def upload():
 def upload_file():
     if 'files[]' not in request.files:
         return jsonify({'success': False, 'message': 'No file part'})
-    VIRUSTOTAL_API_KEY = 'REDACTED'
+    VIRUSTOTAL_API_KEY = os.environ.get('VIRUSTOTAL_API_KEY', '')  # optional: scan is skipped when unset
     VIRUSTOTAL_URL = 'https://www.virustotal.com/api/v3/files/'
 
     files = request.files.getlist('files[]')
@@ -486,8 +486,8 @@ def upload_file():
         file_hash = hashlib.sha256(file.read()).hexdigest()
         file.seek(0)
         headers = {'x-apikey': VIRUSTOTAL_API_KEY}
-        vt_resp = requests.get(VIRUSTOTAL_URL + file_hash, headers=headers)
-        if vt_resp.status_code == 200:
+        vt_resp = requests.get(VIRUSTOTAL_URL + file_hash, headers=headers, timeout=10) if VIRUSTOTAL_API_KEY else None
+        if vt_resp is not None and vt_resp.status_code == 200:
             vt_json = vt_resp.json()
             stats = vt_json.get('data', {}).get('attributes', {}).get('last_analysis_stats', {})
             if stats.get('malicious', 0) > 0 or stats.get('suspicious', 0) > 0:
